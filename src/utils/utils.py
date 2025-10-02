@@ -8,7 +8,7 @@ from typing import List, Sequence
 from omegaconf import DictConfig, OmegaConf
 
 from pytorch_lightning.utilities import rank_zero_only
-from pytorch_lightning import loggers
+from pytorch_lightning.loggers import logger, WandbLogger
 
 
 def read_label_classes_config(path_to_label_classes: str) -> dict:
@@ -79,12 +79,12 @@ def print_config(
         rich.print(tree, file=fp)
 
 
-def finish(logger: List[loggers.LightningLoggerBase]) -> None:
+def finish(logger: List[logger.Logger]) -> None:
     """Makes sure everything closed properly."""
 
     # without this sweeps with wandb logger might crash!
     for lg in logger:
-        if isinstance(lg, loggers.wandb.WandbLogger):
+        if isinstance(lg, WandbLogger):
             import wandb
 
             wandb.finish()

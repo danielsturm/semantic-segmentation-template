@@ -3,6 +3,7 @@
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
 <a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
+
 </div>
 
 ## Description
@@ -10,11 +11,13 @@
 Template for training Semantic Segmentation models.
 Main frameworks:
 
-* [hydra](https://github.com/facebookresearch/hydra)
-* [pytorch-lightning](https://github.com/PyTorchLightning/pytorch-lightning)
+- [hydra](https://github.com/facebookresearch/hydra)
+- [pytorch-lightning](https://github.com/PyTorchLightning/pytorch-lightning)
 
 ## How to run
+
 Install dependencies
+
 ```yaml
 # clone project
 git clone https://github.com/IvanMatoshchuk/semantic-segmentation-template
@@ -24,13 +27,23 @@ cd semantic-segmentation-template
 pip install -r requirements.txt
 ```
 
+- make sure you install pytorch with cuda if needed (eg. `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`)
+- depending on the result mechanism: `pip install tensorboard`
+
 Add your label-classes into `data/label_classes.json`.\
 Specify number of classes in the selected `model` config.
 
+- make sure this is also reflected in the loss config. Classes and class weights should match
+- the classes need to be chronological, so no gaps in between.
+
 Train model with default configuration:
+
 ```yaml
 # default
 python run.py
+
+# trainer.gpus does not work anymore. see trainer/default_trainer.yaml
+python .\run.py trainer.max_epochs=5 logger=tensorboard callbacks=default trainer.accelerator=cpu trainer.devices=1
 
 # train on CPU
 python run.py trainer.gpus=0
@@ -43,11 +56,13 @@ python run.py trainer.gpus=[0,1,2,3]
 ```
 
 You can override any parameter from the command line:
+
 ```yaml
 python run.py trainer.max_epochs=20 datamodule.dataset_args.train.crop_size=416 model=unet
 ```
 
 You can run hyperparameter search from the command line:
+
 ```yaml
 # this will run 6 experiments one after the other,
 # each with different combination of batch_size and learning rate
@@ -55,7 +70,9 @@ python run.py -m datamodule.dataloader_args.train.batch_size=32,64,128 optimizer
 ```
 
 ### How it works
+
 By design, every run is initialized by [run.py](run.py) file. All PyTorch Lightning modules are dynamically instantiated from module paths specified in config. Example model config (unet.yaml):
+
 ```yaml
 _target_: src.model.segmentation_model.HoneyBeeModel
 _recursive_: False
@@ -63,16 +80,19 @@ _recursive_: False
 model_cfg:
   _target_: segmentation_models_pytorch.Unet
 
-  encoder_name: efficientnet-b0  # efficientnet-b0 timm-mobilenetv3_small_100 
+  encoder_name: efficientnet-b0 # efficientnet-b0 timm-mobilenetv3_small_100
   encoder_weights: imagenet
   encoder_depth: 5
   classes: 9
   in_channels: 1
 ```
+
 Using this config we can instantiate the object with the following line:
+
 ```python
 model = hydra.utils.instantiate(config.model)
 ```
+
 This allows you to easily iterate over new models!<br>
 Every time you create a new one, just specify its module path and parameters in appriopriate config file. <br>
 The whole pipeline managing the instantiation logic is placed in [src/train.py](src/train.py).
@@ -80,10 +100,12 @@ The whole pipeline managing the instantiation logic is placed in [src/train.py](
 <br>
 
 ## Main Project Configuration
+
 Location: [configs/config.yaml](configs/config.yaml)<br>
 Main project config contains default training configuration.<br>
 It determines how config is composed when simply executing command `python run.py`.<br>
 It also specifies everything that shouldn't be managed by experiment configurations.
+
 <details>
 <summary><b>Show main project configuration</b></summary>
 
@@ -103,9 +125,9 @@ defaults:
   # enable color logging
   - override hydra/hydra_logging: colorlog
   - override hydra/job_logging: colorlog
- 
+
 general:
-  name: test  # name of the run, accessed by loggers
+  name: test # name of the run, accessed by loggers
   seed: 123
   work_dir: ${hydra:runtime.cwd}
 
@@ -119,6 +141,7 @@ ignore_warnings: False
 # lightning chooses best model based on metric specified in checkpoint callback
 test_after_training: False
 ```
+
 </details>
 
 ## Other Repositories
@@ -127,6 +150,7 @@ test_after_training: False
 <summary><b>Inspirations</b></summary>
 
 This template was inspired by:
+
 - [PyTorchLightning/deep-learninig-project-template](https://github.com/PyTorchLightning/deep-learning-project-template)
 - [Erlemar/pytorch_tempest](https://github.com/Erlemar/pytorch_tempest)
 - [ashleve/lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template)
@@ -140,11 +164,13 @@ This template was inspired by:
 - [qubvel/segmentation_models.pytorch](https://github.com/qubvel/segmentation_models.pytorch) - pytorch-based models for semantic segmentation.
 
 </details>
- 
+
  <br>
 
 ## License
+
 This project is licensed under the MIT License.
+
 ```
 MIT License
 
@@ -168,6 +194,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
-
 
 <br>

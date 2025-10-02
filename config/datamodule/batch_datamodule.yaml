@@ -3,7 +3,8 @@ _recursive_: False
 
 dataset_args:
   train:
-    _target_: src.datamodule.datasets.custom_datasets.CustomDatasetArtificialBatchCrops
+    #_target_: src.datamodule.datasets.custom_datasets.CustomDatasetArtificialBatchCrops
+    _target_: src.datamodule.datasets.custom_datasets.RandomCropDataset
     images_path: "data/train/images"
     labels_path: "data/train/labels"
     crop_size: 224
@@ -36,5 +37,3 @@ dataloader_args:
     pin_memory: False
     num_workers: 1
     drop_last: False
-
-

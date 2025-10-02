@@ -5,7 +5,7 @@ from src.train import train
 from src.utils import utils
 
 
-@hydra.main(config_path="config", config_name="config.yaml")
+@hydra.main(config_path="config", config_name="config.yaml", version_base="1.3")
 def run(cfg: DictConfig) -> None:
 
     # optional utilities. Currently only disables warnings

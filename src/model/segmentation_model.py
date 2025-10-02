@@ -38,7 +38,7 @@ class SegmentationModel(pl.LightningModule):
         self.criterion = hydra.utils.instantiate(cfg.loss)
 
         self.dice_loss = DiceLoss(mode="multiclass", classes=list(range(model_cfg.classes)), from_logits=True)
-        self.accuracy = Accuracy(num_classes=model_cfg.classes, average="weighted")
+        self.accuracy = Accuracy(task="multiclass", num_classes=model_cfg.classes, average="weighted")
 
     def forward(self, images: Tensor) -> Tensor:
         return self.model(images)

@@ -4,9 +4,9 @@ dice_loss:
   _target_: segmentation_models_pytorch.losses.DiceLoss
 
   mode: multiclass
-  classes: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  classes: [0, 1, 2, 3, 4, 5, 6, 7]
   from_logits: True
 
-class_weights:  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+class_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 dice_weight: 0.4
 ce_weight: 0.6

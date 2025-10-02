@@ -13,7 +13,9 @@ wandb/*
 *.avi
 
 
-.vscode
+# .vscode/
+checkpoints/
+config_tree.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

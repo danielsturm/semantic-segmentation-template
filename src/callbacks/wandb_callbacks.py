@@ -10,7 +10,7 @@ import torch
 import wandb
 from monai.inferers import SlidingWindowInferer
 from pytorch_lightning import Callback, Trainer
-from pytorch_lightning.loggers import LoggerCollection, WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
 from sklearn import metrics
 from src.utils.utils import read_label_classes_config
@@ -24,11 +24,14 @@ def get_wandb_logger(trainer: Trainer) -> WandbLogger:
 
     if isinstance(trainer.logger, WandbLogger):
         return trainer.logger
-
-    if isinstance(trainer.logger, LoggerCollection):
+    # If logger is a collection (list/tuple), search for WandbLogger
+    try:
         for logger in trainer.logger:
             if isinstance(logger, WandbLogger):
                 return logger
+    except TypeError:
+        # Not iterable, ignore
+        pass
 
     raise Exception("You are using wandb related callback, but WandbLogger was not found for some reason...")
 
@@ -36,14 +39,22 @@ def get_wandb_logger(trainer: Trainer) -> WandbLogger:
 class WatchModel(Callback):
     """Make wandb watch model at the beginning of the run."""
 
-    def __init__(self, log: str = "gradients", log_freq: int = 100):
-        self.log = log
+    def __init__(self, log_type: str = "gradients", log_freq: int = 100):
+        self.log_type = log_type
         self.log_freq = log_freq
 
     @rank_zero_only
     def on_train_start(self, trainer, pl_module):
         logger = get_wandb_logger(trainer=trainer)
-        logger.watch(model=trainer.model, log=self.log, log_freq=self.log_freq)
+        logger.watch(model=trainer.model, log=self.log_type, log_freq=self.log_freq)
+
+        # Log dataset lengths to wandb
+        try:
+            train_len = len(trainer.datamodule.train_dataloader().dataset)
+            val_len = len(trainer.datamodule.val_dataloader().dataset)
+            logger.experiment.log({"train_dataset_length": train_len, "val_dataset_length": val_len})
+        except Exception as e:
+            print(f"Could not log dataset lengths to wandb: {e}")
 
 
 class UploadCodeAsArtifact(Callback):
@@ -201,7 +212,7 @@ class LogConfusionMatrix(Callback):
             plt.figure(figsize=(14, 8))
 
             # set labels size
-            sns.set(font_scale=1.0)
+            sns.set_theme(font_scale=1.0)
 
             # set font size
             sns.heatmap(cm_df_normalized, annot=True, annot_kws={"size": 6}, fmt=".2%")
@@ -276,10 +287,12 @@ class LogImagePredictions(Callback):
             class_labels = {v: k for k, v in label_classes.items()}
 
             # TODO: make for loop
+            # Convert val_imgs from [B,C,H,W] to [H,W,C] format for wandb
+            val_imgs_np = val_imgs.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
             experiment.log(
                 {
                     "my_image_key": wandb.Image(
-                        val_imgs,
+                        val_imgs_np,
                         masks={
                             "predictions": {
                                 "mask_data": preds.detach().cpu().numpy(),
@@ -291,5 +304,68 @@ class LogImagePredictions(Callback):
                             },
                         },
                     )
+                }
+            )
+
+
+class LogSegmentationMetrics(Callback):
+    """
+    Logs segmentation metrics (pixel accuracy, Dice coefficient, recall, precision, TP, FP, TN, FN) to wandb.
+    """
+
+    def __init__(self, log_freq: int = 1):
+        super().__init__()
+        self.log_freq = log_freq
+        self.ready = True
+
+    @rank_zero_only
+    def on_sanity_check_start(self, trainer, pl_module):
+        self.ready = False
+
+    @rank_zero_only
+    def on_sanity_check_end(self, trainer, pl_module):
+        self.ready = True
+
+    @rank_zero_only
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if self.ready and (trainer.current_epoch % self.log_freq == 0):
+            logger = get_wandb_logger(trainer)
+            experiment = logger.experiment
+
+            all_preds = []
+            all_labels = []
+            val_loader = trainer.datamodule.val_dataloader()
+            for val_imgs, val_labels in val_loader:
+                val_imgs = val_imgs.to(device=pl_module.device)
+                with torch.no_grad():
+                    logits = pl_module(val_imgs)
+                preds = torch.argmax(logits, dim=1).detach().cpu().numpy()
+                all_preds.append(preds.flatten())
+                all_labels.append(val_labels.cpu().numpy().flatten())
+
+            y_true = np.concatenate(all_labels)
+            y_pred = np.concatenate(all_preds)
+
+            cm = metrics.confusion_matrix(y_true, y_pred)
+            TP = np.diag(cm)
+            FP = cm.sum(axis=0) - TP
+            FN = cm.sum(axis=1) - TP
+            TN = cm.sum() - (FP + FN + TP)
+
+            pixel_accuracy = metrics.accuracy_score(y_true, y_pred)
+            dice = metrics.f1_score(y_true, y_pred, average="macro")
+            recall = metrics.recall_score(y_true, y_pred, average="macro")
+            precision = metrics.precision_score(y_true, y_pred, average="macro")
+
+            experiment.log(
+                {
+                    "pixel_accuracy": pixel_accuracy,
+                    "dice_coefficient": dice,
+                    "recall": recall,
+                    "precision": precision,
+                    "TP": int(TP.sum()),
+                    "FP": int(FP.sum()),
+                    "TN": int(TN.sum()),
+                    "FN": int(FN.sum()),
                 }
             )

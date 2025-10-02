@@ -1,11 +1,10 @@
 {
-    "background": 0,
-    "bees": 1,
-    "empty_cell": 2,
-    "open_brood": 3,
-    "open_honey": 4,
-    "capped_honey": 5,
-    "capped_brood": 6,
-    "pollen": 7,
-    "bee_in_cell": 8
+  "background": 0,
+  "empty_cell": 1,
+  "open_brood": 2,
+  "open_honey": 3,
+  "capped_honey": 4,
+  "capped_brood": 5,
+  "pollen": 6,
+  "unclear_cell_class": 7
 }

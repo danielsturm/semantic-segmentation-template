@@ -83,6 +83,97 @@ class CustomDataset(Dataset):
         return len(self.images)
 
 
+class RandomCropDataset(Dataset):
+    """
+    Dataset that returns random crops from images, artificially increasing dataset length.
+    Each image will be used exactly n_crops_in_batch times per epoch, with different random
+    crops and augmentations applied each time.
+
+    Parameters
+    ----------
+        images_path: str
+            path to the location of images
+        labels_path: str
+            path to the location of labels corresponding to training images
+        phase: str
+            name of the process; if == "train", then extensive augmentations are applied
+        crop_size: int
+            size of the random crop that will be applied with the probability=1.
+            If using U-Net-like architecture, the crop-size should be divisble by 32.
+        n_crops_in_batch: int
+            number of crops per image that will be sampled during each epoch.
+            This artificially increases the dataset length
+    """
+
+    def __init__(
+        self,
+        images_path: str,
+        labels_path: str,
+        phase: str,
+        crop_size: int,
+        n_crops_in_batch: int,
+    ):
+        self.images_folder = os.path.join(project_path, images_path)
+        self.masks_folder = os.path.join(project_path, labels_path)
+
+        self.image_names = [i for i in os.listdir(self.images_folder) if not i.startswith(".")]
+        self.mask_names = [i for i in os.listdir(self.masks_folder) if not i.startswith(".")]
+
+        self.images_paths = [os.path.join(self.images_folder, i) for i in self.image_names]
+        self.masks_paths = [os.path.join(self.masks_folder, i) for i in self.mask_names]
+
+        self.crop_size = crop_size
+        self.n_crops_in_batch = n_crops_in_batch
+        self.transforms = self.get_transforms(phase, crop_size)
+
+    def get_transforms(self, phase: str, crop_size: int) -> A.core.composition.Compose:
+
+        list_trans = []
+        if phase == "train":
+            list_trans.extend(
+                [
+                    A.CLAHE(),
+                    A.Rotate(limit=(-90, 90)),
+                    A.HorizontalFlip(p=0.5),
+                    A.VerticalFlip(p=0.5),
+                    A.ShiftScaleRotate(scale_limit=(0.5, 2.0), p=0.5),
+                    A.RandomBrightnessContrast(),
+                ]
+            )
+
+        list_trans.extend(
+            [
+                A.RandomCrop(height=crop_size, width=crop_size, p=1),
+                A.Normalize(mean=0, std=1),
+                ToTensorV2(),
+            ]
+        )
+        list_trans = A.Compose(list_trans)
+        return list_trans
+
+    def __len__(self):
+        return len(self.images_paths) * self.n_crops_in_batch
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+        # Determine which image to use based on the index
+        img_idx = idx // self.n_crops_in_batch
+        img_idx = img_idx % len(self.images_paths)  # Wrap around if we've gone through all images
+
+        image = cv2.imread(self.images_paths[img_idx], 0)
+        mask = cv2.imread(self.masks_paths[img_idx], 0)
+
+        # Ensure image/mask are large enough for crop
+        h, w = image.shape
+        if h < self.crop_size or w < self.crop_size:
+            raise ValueError(f"Image {self.images_paths[img_idx]} too small for crop size {self.crop_size}")
+
+        augmentation = self.transforms(image=image, mask=mask)
+        img_aug = augmentation["image"]
+        mask_aug = augmentation["mask"]
+
+        return img_aug, mask_aug
+
+
 class CustomDatasetArtificialBatchCrops(Dataset):
     """
     This class artifically creates batches consisting of crops from the small number of training images.
@@ -149,7 +240,7 @@ class CustomDatasetArtificialBatchCrops(Dataset):
 
         list_trans.extend(
             [
-                A.RandomCrop(height=crop_size, width=crop_size, always_apply=True, p=1),
+                A.RandomCrop(height=crop_size, width=crop_size, p=1),
                 A.Normalize(mean=0, std=1),
                 ToTensorV2(),
             ]
@@ -159,6 +250,7 @@ class CustomDatasetArtificialBatchCrops(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[Tensor, Tensor]:
 
+        # print(f"Image shape: {self.image.shape}, Mask shape: {self.mask.shape}")
         augmentation = self.transforms(image=self.image, mask=self.mask)
         img_aug = augmentation["image"]
         mask_aug = augmentation["mask"]
