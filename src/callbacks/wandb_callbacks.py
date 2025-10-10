@@ -1,4 +1,5 @@
 import os
+import time
 import subprocess
 from pathlib import Path
 
@@ -55,6 +56,51 @@ class WatchModel(Callback):
             logger.experiment.log({"train_dataset_length": train_len, "val_dataset_length": val_len})
         except Exception as e:
             print(f"Could not log dataset lengths to wandb: {e}")
+
+
+class LogEpochTimes(Callback):
+    """
+    Logs the execution time per epoch for training and validation to wandb.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.train_start_time = None
+        self.val_start_time = None
+
+    @rank_zero_only
+    def on_train_epoch_start(self, trainer, pl_module):
+        self.train_start_time = time.time()
+
+    @rank_zero_only
+    def on_train_epoch_end(self, trainer, pl_module):
+        if self.train_start_time is not None:
+            train_time = time.time() - self.train_start_time
+            logger = get_wandb_logger(trainer)
+            experiment = logger.experiment
+            experiment.log(
+                {
+                    "train_epoch_time_min": train_time / 60,
+                    "epoch": trainer.current_epoch,
+                }
+            )
+
+    @rank_zero_only
+    def on_validation_epoch_start(self, trainer, pl_module):
+        self.val_start_time = time.time()
+
+    @rank_zero_only
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if self.val_start_time is not None:
+            val_time = time.time() - self.val_start_time
+            logger = get_wandb_logger(trainer)
+            experiment = logger.experiment
+            experiment.log(
+                {
+                    "val_epoch_time_min": val_time / 60,
+                    "epoch": trainer.current_epoch,
+                }
+            )
 
 
 class UploadCodeAsArtifact(Callback):

@@ -14,7 +14,7 @@ defaults:
   #- override hydra/job_logging: colorlog
 
 general:
-  name: test # name of the run, accessed by loggers
+  name: test_on_brl_gpu # name of the run, accessed by loggers
   seed: 123
   work_dir: ${hydra:runtime.cwd}
 

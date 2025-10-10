@@ -22,3 +22,6 @@ log_confusion_matrix:
 log_image_predictions:
   _target_: src.callbacks.wandb_callbacks.LogImagePredictions
   log_freq: 300
+
+log_epoch_times:
+  _target_: src.callbacks.wandb_callbacks.LogEpochTimes

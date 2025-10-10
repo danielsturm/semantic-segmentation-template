@@ -26,14 +26,16 @@ dataloader_args:
     num_workers: 8
     drop_last: False
   val:
-    batch_size: 1
+    batch_size: 2
     shuffle: False
     pin_memory: True
-    num_workers: 1
+    num_workers: 2
+    persistent_workers: True
     drop_last: False
   test:
-    batch_size: 1
+    batch_size: 2
     shuffle: False
-    pin_memory: False
-    num_workers: 1
+    pin_memory: True
+    num_workers: 2
+    persistent_workers: True
     drop_last: False

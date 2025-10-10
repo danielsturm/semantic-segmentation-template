@@ -1,8 +1,12 @@
 import hydra
 from omegaconf import DictConfig
 
+# import torch
+
 from src.train import train
 from src.utils import utils
+
+# torch.set_float32_matmul_precision("medium")
 
 
 @hydra.main(config_path="config", config_name="config.yaml", version_base="1.3")
